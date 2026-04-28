@@ -8,6 +8,9 @@ import candleFlame from "./assets/candleFlame.jpg";
 import CandleFlame2 from "./assets/Candleflame2.jpg";
 import stoneBG from "./assets/stoneBG.jpg";
 
+import logolight from "./assets/logolight.jpg";
+import logodark from "./assets/logodark.jpg";
+
 const SVG = {
   leaf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.5 1 6.5s-2.84 4.16-8 4.16L19 20"/><path d="M2 21c0-3 1.85-5.36 5.08-6M5 21H2"/></svg>`,
   seedling: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12"/><path d="M12 12C12 7 7 3 3 3c0 5 4 9 9 9"/><path d="M12 12c0-5 5-9 9-9-1 5-5 9-9 9"/></svg>`,
@@ -29,10 +32,10 @@ const SVG = {
 // ── INJECT IMAGES ──
 function updateNavLogo() {
   const theme = document.documentElement.getAttribute("data-theme");
-  // Same logo both modes, just the CSS tint changes
-  document.getElementById("nav-logo").src = BGT1;
+  document.getElementById("nav-logo").src =
+    theme === "light" ? logolight : logodark;
 }
-document.getElementById("nav-logo").src = BGT1;
+document.getElementById("nav-logo").src = logodark; // default, will switch on load
 document.getElementById("hero-bg-img").src = BG3;
 // hero logo badge removed
 document.getElementById("about-img").src = candleFlame;
@@ -247,6 +250,19 @@ function renderCart() {
       .reduce((s, i) => s + parseFloat(i.price.replace("£", "")), 0)
       .toFixed(2);
   footer.style.display = "block";
+  footer.style.display = "block";
+
+  // Add checkout button if not already there
+  if (!document.getElementById("stripe-checkout-btn")) {
+    const btn = document.createElement("button");
+    btn.id = "stripe-checkout-btn";
+    btn.className = "btn-main";
+    btn.style.cssText =
+      "display:block;width:100%;text-align:center;margin-top:16px;border:none;cursor:pointer;";
+    btn.textContent = "Checkout →";
+    btn.addEventListener("click", handleCheckout);
+    document.getElementById("cart-footer").appendChild(btn);
+  }
 }
 window.removeFromCart = (i) => {
   cart.splice(i, 1);
@@ -267,7 +283,55 @@ function showToast() {
 }
 
 // ── LOGIN ──
+// ── LOGIN / AUTH ──
+const netlifyIdentity = window.netlifyIdentity;
 
+let currentUser = null;
+
+if (netlifyIdentity) {
+  netlifyIdentity.init();
+  currentUser = netlifyIdentity.currentUser();
+
+  netlifyIdentity.on("init", () => updateAuthUI());
+  netlifyIdentity.on("login", (user) => {
+    currentUser = user;
+    updateAuthUI();
+    netlifyIdentity.close();
+    document.getElementById("toast").textContent =
+      `Welcome, ${user.user_metadata?.full_name?.split(" ")[0] || "there"}!`;
+    showToast();
+    const redirect = sessionStorage.getItem("checkout_redirect");
+    if (redirect) {
+      sessionStorage.removeItem("checkout_redirect");
+      window.location.href = redirect;
+    }
+  });
+  netlifyIdentity.on("logout", () => {
+    currentUser = null;
+    updateAuthUI();
+    document.getElementById("toast").textContent = "Signed out";
+    showToast();
+  });
+  netlifyIdentity.on("error", (err) => console.error("Auth error:", err));
+}
+
+window.openLogin = () => {
+  window.location.href = "/login.html";
+};
+
+window.closeLogin = () => {
+  if (netlifyIdentity) netlifyIdentity.close();
+};
+
+window.toggleTheme = () => {
+  const next =
+    document.documentElement.getAttribute("data-theme") === "light"
+      ? "dark"
+      : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("plandria-theme", next);
+  updateNavLogo();
+};
 // ── MOBILE MENU ──
 window.toggleMenu = () =>
   document.getElementById("mobile-menu").classList.toggle("open");
